@@ -84,6 +84,18 @@ jobs:
             target/x86_64-apple-darwin/release/libzerobox_network.dylib \
             target/aarch64-apple-darwin/release/libzerobox_network.dylib \
             -output package/lib/libzerobox_network.dylib
+          install_name_tool \
+            -id '@rpath/libzerobox_network.dylib' \
+            package/lib/libzerobox_network.dylib
+          install_name_count="$(
+            otool -D package/lib/libzerobox_network.dylib \
+              | grep -Fc '@rpath/libzerobox_network.dylib'
+          )"
+          if [[ "$install_name_count" -ne 2 ]]; then
+            echo "Expected @rpath install name in both macOS architecture slices" >&2
+            otool -D package/lib/libzerobox_network.dylib >&2
+            exit 1
+          fi
           cp include/zerobox_network.h package/include/
           cp LICENSE README.md THIRD_PARTY_NOTICES.md package/
           tar -czf "$asset" -C package lib include LICENSE README.md THIRD_PARTY_NOTICES.md
