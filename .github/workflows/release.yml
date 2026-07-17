@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            arch: x86_64
+          - target: aarch64-unknown-linux-gnu
+            arch: aarch64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: taiki-e/install-action@cross
+      - run: cross build --release --locked --target ${{ matrix.target }}
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset="zerobox-network-linux-${{ matrix.arch }}.tar.gz"
+          mkdir -p package/lib package/include
+          cp "target/${{ matrix.target }}/release/libzerobox_network.so" package/lib/
+          cp include/zerobox_network.h package/include/
+          cp LICENSE README.md THIRD_PARTY_NOTICES.md package/
+          tar -czf "$asset" -C package lib include LICENSE README.md THIRD_PARTY_NOTICES.md
+          sha256sum "$asset" > "$asset.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: zerobox-network-linux-${{ matrix.arch }}.tar.gz*
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --locked
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package/lib, package/include | Out-Null
+          Copy-Item target/release/zerobox_network.dll package/lib/
+          Copy-Item target/release/zerobox_network.dll.lib package/lib/
+          Copy-Item include/zerobox_network.h package/include/
+          Copy-Item LICENSE,README.md,THIRD_PARTY_NOTICES.md package/
+          Compress-Archive -Path package/lib,package/include,package/LICENSE,package/README.md,package/THIRD_PARTY_NOTICES.md -DestinationPath zerobox-network-windows-x86_64.zip
+          $hash = (Get-FileHash zerobox-network-windows-x86_64.zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  zerobox-network-windows-x86_64.zip" | Set-Content -NoNewline zerobox-network-windows-x86_64.zip.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: zerobox-network-windows-x86_64.zip*
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+      - run: cargo build --release --locked --target x86_64-apple-darwin
+      - run: cargo build --release --locked --target aarch64-apple-darwin
+      - name: Package universal library
+        run: |
+          set -euo pipefail
+          asset="zerobox-network-macos-universal.tar.gz"
+          mkdir -p package/lib package/include
+          lipo -create \
+            target/x86_64-apple-darwin/release/libzerobox_network.dylib \
+            target/aarch64-apple-darwin/release/libzerobox_network.dylib \
+            -output package/lib/libzerobox_network.dylib
+          cp include/zerobox_network.h package/include/
+          cp LICENSE README.md THIRD_PARTY_NOTICES.md package/
+          tar -czf "$asset" -C package lib include LICENSE README.md THIRD_PARTY_NOTICES.md
+          shasum -a 256 "$asset" > "$asset.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-universal
+          path: zerobox-network-macos-universal.tar.gz*
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+          add-to-path: true
+      - uses: taiki-e/install-action@cargo-ndk
+      - run: cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -o package/jniLibs build --release --locked
+      - name: Package
+        run: |
+          set -euo pipefail
+          asset="zerobox-network-android.zip"
+          cp LICENSE README.md THIRD_PARTY_NOTICES.md package/
+          (cd package && zip -9 -r "../$asset" jniLibs LICENSE README.md THIRD_PARTY_NOTICES.md)
+          sha256sum "$asset" > "$asset.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: zerobox-network-android.zip*
+
+  publish:
+    needs: [linux, windows, macos, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          merge-multiple: true
+          path: dist
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dist/*

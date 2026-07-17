@@ -1,0 +1,12 @@
+/target/
+/.dart_tool/
+/.packages
+/pubspec.lock
+/.idea/
+/build/
+/example/build/
+/android/.gradle/
+/macos/Frameworks/
+*.iml
+*.log
+.DS_Store

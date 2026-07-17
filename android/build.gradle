@@ -1,0 +1,71 @@
+group 'org.zxor.zerobox.network'
+version '0.1.0'
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.9.1'
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace 'org.zxor.zerobox.network'
+    compileSdk 35
+
+    defaultConfig {
+        minSdk 23
+    }
+
+    sourceSets {
+        main.jniLibs.srcDirs = ["$buildDir/zeroboxNetwork/jniLibs"]
+    }
+}
+
+def networkVersion = '0.1.0'
+def releaseBase = "https://github.com/zxor-org/ZeroBox-Package-Network/releases/download/v${networkVersion}"
+def outputDir = file("$buildDir/zeroboxNetwork")
+def archive = file("$outputDir/zerobox-network-android.zip")
+
+tasks.register('fetchZeroboxNetwork') {
+    outputs.dir(file("$outputDir/jniLibs"))
+    doLast {
+        outputDir.mkdirs()
+        def checksumFile = file("${archive}.sha256")
+        new URL("${releaseBase}/${archive.name}").withInputStream { input ->
+            archive.withOutputStream { output -> output << input }
+        }
+        new URL("${releaseBase}/${archive.name}.sha256").withInputStream { input ->
+            checksumFile.withOutputStream { output -> output << input }
+        }
+
+        def expected = checksumFile.text.trim().split(' ')[0].toLowerCase()
+        def digest = java.security.MessageDigest.getInstance('SHA-256')
+        archive.withInputStream { input ->
+            byte[] buffer = new byte[65536]
+            for (int read = input.read(buffer); read >= 0; read = input.read(buffer)) {
+                if (read > 0) digest.update(buffer, 0, read)
+            }
+        }
+        def actual = digest.digest().collect { String.format('%02x', it) }.join()
+        if (actual != expected) {
+            archive.delete()
+            throw new GradleException("Checksum mismatch for ${archive.name}")
+        }
+
+        copy {
+            from zipTree(archive)
+            into outputDir
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name.startsWith('merge') && task.name.endsWith('JniLibFolders')) {
+        task.dependsOn tasks.named('fetchZeroboxNetwork')
+    }
+}

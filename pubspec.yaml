@@ -1,0 +1,31 @@
+name: zerobox_network
+description: Native userspace IP gateway for Xiaomi VelaOS devices
+version: 0.1.0
+repository: https://github.com/zxor-org/ZeroBox-Package-Network
+publish_to: none
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+  flutter: ">=3.38.0"
+
+dependencies:
+  ffi: ^2.1.4
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        ffiPlugin: true
+      linux:
+        ffiPlugin: true
+      macos:
+        ffiPlugin: true
+      windows:
+        ffiPlugin: true

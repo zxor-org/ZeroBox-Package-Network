@@ -1,0 +1,25 @@
+[package]
+name = "zerobox-network"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+description = "Userspace IP gateway for Xiaomi VelaOS devices"
+
+[lib]
+name = "zerobox_network"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anyhow = "1"
+dhcproto = "0.14"
+etherparse = { version = "0.19", default-features = false, features = ["std"] }
+ipstack = { git = "https://github.com/searchstars/ipstack-astrobox.git", rev = "82fb65a57dee33445b61d2470c9390d80ad08f50" }
+once_cell = "1"
+packet_crafter = "0.2"
+parking_lot = "0.12"
+pcap-file = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "io-util", "net"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+udp-stream = { version = "0.0", default-features = false }
