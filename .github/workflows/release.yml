@@ -104,7 +104,9 @@ jobs:
         with:
           ndk-version: r27c
           add-to-path: true
-      - uses: taiki-e/install-action@cargo-ndk
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
       - run: cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 -o package/jniLibs build --release --locked
       - name: Package
         run: |
